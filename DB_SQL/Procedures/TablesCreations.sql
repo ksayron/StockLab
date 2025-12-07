@@ -1,0 +1,6 @@
+CREATE TABLE Sectors (
+    Id INT IDENTITY PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL,
+    Description NVARCHAR(500) NULL,
+    Buff DECIMAL(5,2) NULL
+);

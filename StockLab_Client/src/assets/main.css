@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* --- ПАЛИТРА --- */
+    --color-primary: #004e89; /* Темно-синий */
+    --color-secondary: #1a659e; /* Дополнительный синий */
+    --color-bg: #edf2fb; /* Фоновый (светлый) */
+    --color-my-green:#06d6a0;
+    --color-my-red:#ef476f;
+
+    /* Новые цвета для трейдинга */
+        --color-success: #06d6a0; /* Зеленый (Рост) */
+        --color-danger: #ef476f;  /* Красный (Падение) */
+
+        /* Переопределяем цвета PrimeVue для семантики */
+        --p-green-500: var(--color-success);
+        --p-red-500: var(--color-danger);
+
+    /* --- PRIMEVUE THEME OVERRIDE (Перекрашиваем кнопки и инпуты) --- */
+
+    /* Основной цвет (Primary Button) -> Темно-синий */
+    --p-primary-color: var(--color-primary);
+    --p-primary-hover-color: #003f6e; /* Чуть темнее при наведении */
+    --p-primary-active-color: #003f6e;
+    --p-primary-color-text: #ffffff;
+
+    /* Фон страницы */
+    --p-content-background: var(--color-bg);
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: #1f2937; /* Темно-серый текст для читаемости */
+  }
+}
+
+.content-card {
+  background-color: var(--color-bg); /* Такой же как фон страницы */
+  border: 1px solid var(--color-secondary); /* Граница цвета Secondary */
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary) !important;
+  border-color: var(--color-secondary) !important;
+  color: white !important;
+}
+.btn-secondary:hover {
+  filter: brightness(110%);
+}
+#app {
+  display: flex;
+  flex-direction: column; /* Важно для прижатия футера */
+  max-width: none !important; /* Переопределяем любые ограничения */
+}
+
+/* Утилитарные классы для текста */
+.text-trade-success { color: var(--color-success); }
+.text-trade-danger { color: var(--color-danger); }
+.bg-trade-success { background-color: var(--color-success); }
+.bg-trade-danger { background-color: var(--color-danger); }

@@ -1,0 +1,6 @@
+@StockLab_HostAddress = http://localhost:5215
+
+GET {{StockLab_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

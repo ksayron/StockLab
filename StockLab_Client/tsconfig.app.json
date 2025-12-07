@@ -1,0 +1,24 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
+  "exclude": ["src/**/__tests__/*"],
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",             // <--- Исправляет вашу ошибку
+    "moduleResolution": "bundler",  // <--- Рекомендуется для Vite
+    "strict": true,
+    "jsx": "preserve",
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ESNext", "DOM"],
+    "skipLibCheck": true,
+    "types": ["vite/client"],        // <--- Важно для подсказок .env
+    // 2. Объясняем, что @/ ведет в папку src/
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
