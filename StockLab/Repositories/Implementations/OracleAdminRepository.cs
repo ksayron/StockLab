@@ -231,7 +231,7 @@ namespace StockLab.Repositories.Implementations
         public async Task<string> ExportDatabaseJsonAsync()
         {
             using var conn = await GetAdminConnectionAsync();
-            using var cmd = new OracleCommand("stock_admin.pkg_data_management.export_database_json", conn);
+            using var cmd = new OracleCommand("stock_admin.pkg_data_management.export_market_data", conn);
             cmd.CommandType = CommandType.StoredProcedure;
             cmd.BindByName = true;
 
@@ -255,12 +255,80 @@ namespace StockLab.Repositories.Implementations
         public async Task ImportDatabaseJsonAsync(string jsonContent)
         {
             using var conn = await GetAdminConnectionAsync();
-            using var cmd = new OracleCommand("stock_admin.pkg_data_management.import_database_json", conn);
+
+            // ВАЖНО: Вызываем новую процедуру с внутренней логикой
+            using var cmd = new OracleCommand("stock_admin.pkg_data_management.import_market_data", conn);
+
             cmd.CommandType = CommandType.StoredProcedure;
             cmd.BindByName = true;
 
-            // Передаем CLOB
+            // Передаем JSON
             cmd.Parameters.Add("p_json_clob", OracleDbType.Clob, jsonContent, ParameterDirection.Input);
+
+            // Получаем статус
+            var pStatus = cmd.Parameters.Add("o_status", OracleDbType.Varchar2, 50, null, ParameterDirection.Output);
+            var pMessage = cmd.Parameters.Add("o_message", OracleDbType.Varchar2, 4000, null, ParameterDirection.Output);
+
+            await cmd.ExecuteNonQueryAsync();
+
+            // Если внутри БД произойдет ошибка (например, сбой IPO), 
+            // процедура вернет ERROR и сообщение, которое мы здесь поймаем
+            CheckStatus(pStatus, pMessage);
+        }
+        public async Task<IEnumerable<AdminUserDetailDto>> GetAllUsersAsync()
+        {
+            var list = new List<AdminUserDetailDto>();
+            using var conn = await GetAdminConnectionAsync();
+            using var cmd = new OracleCommand("stock_admin.pkg_admin_tools.get_all_users", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.BindByName = true;
+
+            cmd.Parameters.Add("o_cursor", OracleDbType.RefCursor, ParameterDirection.Output);
+            var pStatus = cmd.Parameters.Add("o_status", OracleDbType.Varchar2, 50, null, ParameterDirection.Output);
+            var pMessage = cmd.Parameters.Add("o_message", OracleDbType.Varchar2, 4000, null, ParameterDirection.Output);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                list.Add(new AdminUserDetailDto
+                {
+                    UserId = reader.GetInt32(0),
+                    Username = reader.GetString(1),
+                    Email = reader.GetString(2),
+                    Balance = reader.GetDecimal(3),
+                    IsBanned = reader.GetInt32(4) == 1,
+                    RoleName = reader.GetString(5),
+                    CreatedAt = reader.GetDateTime(6)
+                    // TotalOrders/Trades здесь можно опустить для скорости списка, подгружать в деталях
+                });
+            }
+            reader.Close();
+            CheckStatus(pStatus, pMessage);
+            return list;
+        }
+
+        public async Task<bool> GetSimulationStatusAsync()
+        {
+            using var conn = await GetAdminConnectionAsync();
+            using var cmd = new OracleCommand("stock_admin.pkg_market_bots.get_simulation_status", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            var pIsRunning = cmd.Parameters.Add("o_is_running", OracleDbType.Int32, ParameterDirection.Output);
+
+            await cmd.ExecuteNonQueryAsync();
+
+            return ((OracleDecimal)pIsRunning.Value).ToInt32() == 1;
+        }
+
+        public async Task ToggleSimulationAsync(bool enable)
+        {
+            using var conn = await GetAdminConnectionAsync();
+            string procName = enable
+                ? "stock_admin.pkg_market_bots.start_simulation"
+                : "stock_admin.pkg_market_bots.stop_simulation";
+
+            using var cmd = new OracleCommand(procName, conn);
+            cmd.CommandType = CommandType.StoredProcedure;
 
             var pStatus = cmd.Parameters.Add("o_status", OracleDbType.Varchar2, 50, null, ParameterDirection.Output);
             var pMessage = cmd.Parameters.Add("o_message", OracleDbType.Varchar2, 4000, null, ParameterDirection.Output);

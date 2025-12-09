@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notifications'
 import { useRouter } from 'vue-router'
 import Menubar from 'primevue/menubar'
 import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
 import Badge from 'primevue/badge'
 import Drawer from 'primevue/drawer'
+import AdminDrawer from '@/components/Admin/AdminDrawer.vue'
+import NotificationList from '@/components/Notifications/NotificationList.vue'
 // import NotificationList from ...
 
 const auth = useAuthStore()
 const router = useRouter()
+const notifStore = useNotificationStore()
 const isNotificationOpen = ref(false)
+const isAdminMenuOpen = ref(false)
 
 const items = ref([
   {
@@ -28,7 +33,7 @@ const items = ref([
     command: () => router.push('/portfolio'),
     class: 'text-brand-bg ',
   },
-    {
+  {
     label: 'Ордера',
     icon: 'pi pi-list',
     visible: () => auth.isAuthenticated,
@@ -46,11 +51,22 @@ const onLogout = async () => {
 <template>
   <div class="w-full bg-brand-primary text-brand-bg shadow-md">
     <div class="container mx-auto">
+      <AdminDrawer v-model:visible="isAdminMenuOpen" />
+
       <Menubar
         :model="items"
         class="!bg-transparent !border-none !rounded-none px-4 py-3 custom-menubar"
       >
         <template #start>
+          <Button
+            v-if="auth.isAdmin"
+            icon="pi pi-bars"
+            text
+            rounded
+            class="!text-white hover:!bg-brand-secondary"
+            v-tooltip.bottom="'Меню Администратора'"
+            @click="isAdminMenuOpen = true"
+          />
           <div
             class="font-bold text-2xl mr-8 flex items-center gap-2 cursor-pointer text-white"
             @click="router.push('/')"
@@ -73,11 +89,15 @@ const onLogout = async () => {
                 icon="pi pi-bell"
                 text
                 rounded
-                class="!text-brand-bg hover:!bg-brand-secondary"
-                badge="2"
+                class="!text-brand-bg hover:!bg-brand-secondary relative"
                 @click="isNotificationOpen = true"
               >
-                
+                <span
+                  v-if="notifStore.unreadCount"
+                  class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white"
+                >
+                  {{ notifStore.unreadCount }}
+                </span>
               </Button>
 
               <Avatar
@@ -86,7 +106,7 @@ const onLogout = async () => {
                 class="bg-brand-secondary text-white"
               />
               <div class="!text-brand-bg md:flex flex-col items-end mr-2">
-                  {{ auth.user?.username }}
+                {{ auth.user?.username }}
               </div>
 
               <Button
@@ -95,7 +115,6 @@ const onLogout = async () => {
                 rounded
                 class="!text-brand-bg hover:!bg-brand-secondary"
                 @click="onLogout"
-                tooltip="Выйти"
               />
             </template>
 
@@ -125,7 +144,7 @@ const onLogout = async () => {
       header="Уведомления"
       class="!w-full md:!w-80 lg:!w-[30rem]"
     >
-      <p class="text-gray-600">Здесь будет список уведомлений...</p>
+      <NotificationList />
     </Drawer>
   </div>
 </template>

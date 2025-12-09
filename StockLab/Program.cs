@@ -159,7 +159,7 @@ namespace StockLab
             app.UseAuthentication();
             app.UseAuthorization();
             //app.MapHub<MarketHub>("/hubs/market");
-            app.MapHub<NotificationHub>("/hubs/notofication");
+            app.MapHub<NotificationHub>("/hubs/notifications");
 
             app.UseHttpsRedirection();
 

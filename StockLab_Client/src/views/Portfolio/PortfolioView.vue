@@ -99,9 +99,6 @@ const initPieChart = () => {
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 const getAssetTransactions = (companyId: number) => {
-    // Фильтруем общую историю ордеров для конкретной компании
-    // Берем только выполненные или частичные сделки (где есть движение денег/акций)
-    // В идеале нужен эндпоинт /trades, но orders тоже сойдет для истории
     return orders.value
         .filter(o => o.ticker === items.value.find(i => i.companyId === companyId)?.ticker)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -154,17 +151,6 @@ onUnmounted(() => {
                         <Column header="Цена" field="currentPrice" sortable>
                             <template #body="{ data }">
                                 {{ data.currentPrice.toFixed(2) }} $
-                            </template>
-                        </Column>
-
-                        <Column header="Изм. (30м)" field="priceChangePercent" sortable>
-                            <template #body="{ data }">
-                                <span :class="data.priceChangePercent >= 0 ? 'text-trade-success' : 'text-trade-danger'" class="font-bold">
-                                    {{ data.priceChangePercent > 0 ? '+' : '' }}{{ data.priceChangePercent.toFixed(2) }}%
-                                </span>
-                                <div class="text-xs text-gray-400">
-                                    UTC: {{ new Date().toLocaleTimeString('en-GB', {timeZone: 'UTC', hour:'2-digit', minute:'2-digit'}) }}
-                                </div>
                             </template>
                         </Column>
 

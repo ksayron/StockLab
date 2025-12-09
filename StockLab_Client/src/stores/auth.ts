@@ -13,6 +13,7 @@ interface UserProfile {
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserProfile | null>(null)
   const isAuthenticated = computed(() => !!user.value)
+  const isAdmin = computed(() => user.value?.roleName === 'Admin');
   const isLoading = ref(false)
 
   // 1. Проверка авторизации при загрузке (Auto-login)
@@ -54,5 +55,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, isAuthenticated, isLoading, login, logout, checkAuth }
+  return { user, isAuthenticated, isAdmin, isLoading, login, logout, checkAuth }
 })

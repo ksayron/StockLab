@@ -57,6 +57,12 @@ CREATE OR REPLACE PACKAGE pkg_admin_tools AS
         o_status       OUT VARCHAR2,
         o_message      OUT VARCHAR2
     );
+    
+    PROCEDURE get_all_users (
+    o_cursor  OUT SYS_REFCURSOR,
+    o_status  OUT VARCHAR2,
+    o_message OUT VARCHAR2
+    );
 
 END pkg_admin_tools;
 /
@@ -274,6 +280,28 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_tools AS
             o_status := 'ERROR';
             o_message := 'Не удалось прочитать логи';
     END get_system_error_logs;
+    
+    PROCEDURE get_all_users (
+    o_cursor  OUT SYS_REFCURSOR,
+    o_status  OUT VARCHAR2,
+    o_message OUT VARCHAR2
+    ) IS
+    BEGIN
+        o_status := 'SUCCESS';
+        o_message := 'ОК';
+        
+        OPEN o_cursor FOR
+            SELECT u.user_id, u.username, u.email, u.balance, u.is_banned, 
+                r.name as role_name, u.created_at
+            FROM users u
+            JOIN roles r ON u.role_id = r.role_id
+            ORDER BY u.created_at DESC;
+    EXCEPTION
+        WHEN OTHERS THEN
+            stock_admin.pkg_logger.log_error('pkg_admin_tools.get_all_users', NULL, SQLCODE, SQLERRM);
+            o_status := 'ERROR';
+            o_message := 'Внутренняя ошибка сервера';
+    END get_all_users;
 
 END pkg_admin_tools;
 /

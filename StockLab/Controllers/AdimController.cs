@@ -229,15 +229,51 @@ namespace StockLab.Controllers
         {
             try
             {
-                // Предполагается, что вы добавили этот метод в интерфейс репозитория в предыдущем шаге
-                // var logs = await _repository.GetSystemLogsAsync(minutes);
-                // return Ok(new { success = true, data = logs });
-                return Ok(); // Заглушка, если метод еще не добавлен в IAdminRepository
+                
+                var logs = await _repository.GetSystemLogsAsync(minutes);
+                return Ok(new { success = true, data = logs });
+
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
+        }
+        [HttpGet("users")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            try
+            {
+                var users = await _repository.GetAllUsersAsync();
+                return Ok(new { success = true, data = users });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+        // GET /api/admin/simulation
+        [HttpGet("simulation")]
+        public async Task<IActionResult> GetSimStatus()
+        {
+            try
+            {
+                bool isRunning = await _repository.GetSimulationStatusAsync();
+                return Ok(new { success = true, isRunning });
+            }
+            catch (Exception ex) { return StatusCode(500, new { success = false, message = ex.Message }); }
+        }
+
+        // POST /api/admin/simulation
+        [HttpPost("simulation")]
+        public async Task<IActionResult> ToggleSim([FromBody] bool enable)
+        {
+            try
+            {
+                await _repository.ToggleSimulationAsync(enable);
+                return Ok(new { success = true, message = enable ? "Simulation Started" : "Simulation Stopped" });
+            }
+            catch (Exception ex) { return StatusCode(500, new { success = false, message = ex.Message }); }
         }
     }   
 }

@@ -1,7 +1,7 @@
 CREATE OR REPLACE PACKAGE pkg_portfolio AS
 
     -- Константа
-    c_calc_interval CONSTANT INTERVAL DAY TO SECOND := INTERVAL '15' MINUTE;
+    c_calc_interval CONSTANT INTERVAL DAY TO SECOND := INTERVAL '30' MINUTE;
 
     -- Получить общую сводку
     PROCEDURE get_portfolio_summary (

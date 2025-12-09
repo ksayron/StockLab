@@ -13,5 +13,8 @@ namespace StockLab.Repositories.Interfaces
         Task<IEnumerable<SystemLogDto>> GetSystemLogsAsync(int? minutesBack);
         Task<string> ExportDatabaseJsonAsync();
         Task ImportDatabaseJsonAsync(string jsonContent);
+        Task<IEnumerable<AdminUserDetailDto>> GetAllUsersAsync();
+        Task<bool> GetSimulationStatusAsync();
+        Task ToggleSimulationAsync(bool enable);
     }
 }

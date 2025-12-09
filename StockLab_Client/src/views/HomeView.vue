@@ -118,7 +118,7 @@ onMounted(() => {
 
     <DataTable
       :value="companies"
-      lazy
+
       paginator
       :rows="10"
       :totalRecords="totalRecords"
@@ -126,10 +126,10 @@ onMounted(() => {
       @sort="onSort"
       tableStyle="min-width: 70rem"
     >
-      <Column field="ticker" header="Тикер" sortable></Column>
-      <Column field="name" header="Компания" sortable></Column>
-      <Column field="sectorName" header="Сектор"></Column>
-      <Column field="currentPrice" header="Цена" sortable>
+      <Column field="ticker" header="Тикер" sortable style="min-width: 180px;"></Column>
+      <Column field="name" header="Компания" sortable style="min-width: 200px;"></Column>
+      <Column field="sectorName" header="Сектор" style="min-width: 150px;"></Column>
+      <Column field="currentPrice" header="Цена" sortable style="min-width: 150px;">
         <template #body="slotProps">
           <span class="font-bold text-lg">${{ slotProps.data.currentPrice.toFixed(2) }}</span>
         </template>

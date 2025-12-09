@@ -1,18 +1,35 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted,watch } from 'vue'
 import { RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notifications'
+import { useToast } from 'primevue/usetoast';
 import Header from '@/components/Header.vue'
 import Footer from '@/components/Footer.vue'
 import Toast from 'primevue/toast' // Глобальный контейнер для уведомлений
 
 const authStore = useAuthStore()
+const notifStore = useNotificationStore();
+const toast = useToast();
 
 onMounted(async () => {
   // При старте приложения пытаемся восстановить сессию
   // Если кука AuthToken есть и валидна, стор обновится и статус станет isAuthenticated = true
   await authStore.checkAuth()
+  if (authStore.isAuthenticated) {
+        notifStore.connect(toast);
+        notifStore.fetchHistory();
+    }
 })
+
+watch(() => authStore.isAuthenticated, (isAuth) => {
+    if (isAuth) {
+        notifStore.connect(toast);
+        notifStore.fetchHistory();
+    } else {
+        notifStore.disconnect();
+    }
+});
 </script>
 
 <template>
