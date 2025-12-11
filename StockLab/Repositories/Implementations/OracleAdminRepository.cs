@@ -196,7 +196,7 @@ namespace StockLab.Repositories.Implementations
         {
             var list = new List<SystemLogDto>();
             using var conn = await GetAdminConnectionAsync();
-            using var cmd = new OracleCommand("stock_admin.pkg_admin_tools.get_system_logs", conn);
+            using var cmd = new OracleCommand("stock_admin.pkg_admin_tools.get_system_error_logs", conn);
             cmd.CommandType = CommandType.StoredProcedure;
             cmd.BindByName = true;
 

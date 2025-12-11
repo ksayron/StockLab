@@ -11,11 +11,10 @@ GRANT CREATE SESSION, CREATE TABLE, CREATE VIEW, CREATE SEQUENCE, CREATE PROCEDU
 TO role_admin;
 grant create public synonym to role_admin;
 -- restricted DML, no DDL
-GRANT CREATE SESSION, SELECT ANY TABLE, INSERT ANY TABLE, UPDATE ANY TABLE, DELETE ANY TABLE
+GRANT CREATE SESSION
 TO role_user;
-
 -- read-only
-GRANT CREATE SESSION, SELECT ANY TABLE
+GRANT CREATE SESSION
 TO role_guest;
 
 alter USER stock_admin IDENTIFIED BY "admin123!"
@@ -44,7 +43,6 @@ GRANT role_guest TO stock_guest;
 -- убираем срок жизни парлоей
 ALTER PROFILE DEFAULT LIMIT PASSWORD_LIFE_TIME UNLIMITED;
 
--- 7️⃣ Optional: make stock_admin schema owner
 ALTER USER stock_admin DEFAULT ROLE ALL;
 ALTER USER stock_admin QUOTA UNLIMITED ON stocklab_data;
 ALTER USER stock_admin QUOTA UNLIMITED ON stocklab_index;

@@ -41,9 +41,10 @@ END pkg_market_bots;
 /
 
 
-    CREATE OR REPLACE PACKAGE BODY pkg_market_bots AS
+CREATE OR REPLACE PACKAGE BODY pkg_market_bots AS
         c_bot_prefix CONSTANT VARCHAR2(4) := 'BOT_';
         c_job_name   CONSTANT VARCHAR2(30) := 'JOB_BOT_TRADING';
+        c_wakeup_job_name   CONSTANT VARCHAR2(30) := 'JOB_MARKET_WAKEUP_SERVICE';
     
         -- =========================================================
         -- 1. CLEANUP OLD ORDERS (TTL)
@@ -91,7 +92,8 @@ END pkg_market_bots;
                     SELECT user_id, balance INTO v_issuer_id, v_balance
                     FROM users 
                     WHERE username = 'ISSUER_' || r.ticker_symbol;
-    
+                    
+                    clean_old_bot_orders(v_issuer_id);
                     -- Проверяем, сколько у него уже активных ордеров на покупку
                     SELECT COUNT(*) INTO v_active_buys 
                     FROM orders 
@@ -100,8 +102,7 @@ END pkg_market_bots;
                     -- Логика:
                     -- 1. Если ордеров на покупку мало (< 3)
                     -- 2. И есть деньги (баланс > 10 * цена акции)
-                    IF v_active_buys < 3 AND v_balance > (r.current_price * 10) THEN
-                        
+                    IF v_active_buys < 3 AND v_balance > (r.current_price * 3) THEN
                         -- Ставим цену ПОКУПКИ чуть ниже рынка (Support Level)
                         -- Например, на 2-5% ниже текущей
                         v_buy_price := r.current_price * (1 - DBMS_RANDOM.VALUE(0.02, 0.05));
@@ -119,11 +120,9 @@ END pkg_market_bots;
                             o_message     => v_msg
                         );
                     END IF;
-    
-                    -- Также Эмитент может чистить свои слишком старые ордера (например, старше 10 мин)
-                    -- (можно добавить вызов clean_old_bot_orders(v_issuer_id) с другой логикой времени)
-    
-                EXCEPTION WHEN OTHERS THEN NULL; -- Игнорируем ошибки конкретного эмитента
+                    
+                EXCEPTION WHEN OTHERS THEN 
+                stock_admin.pkg_logger.log_error('pkg_market_bot.perform_issuer_maintenance', null, SQLCODE, SQLERRM);
                 END;
             END LOOP;
         END perform_issuer_maintenance;
@@ -143,8 +142,13 @@ END pkg_market_bots;
             v_qty           NUMBER;
             v_limit_price   NUMBER;
             
-            v_min_price     NUMBER;
-            v_max_price     NUMBER;
+            v_min_allowed   NUMBER;
+            v_max_allowed   NUMBER;
+    
+    -- Коэффициенты агрессии
+            v_risk_factor   NUMBER; 
+            v_price_skew    NUMBER;
+            v_market_mood   NUMBER;
             
             v_order_id      NUMBER;
             v_status        VARCHAR2(50);
@@ -155,11 +159,16 @@ END pkg_market_bots;
                 SELECT user_id, balance INTO v_user_id, v_balance
                 FROM (SELECT user_id, balance FROM users WHERE username LIKE c_bot_prefix || '%' ORDER BY DBMS_RANDOM.VALUE)
                 WHERE ROWNUM = 1;
+                
+                IF v_balance < 1000 THEN
+                v_balance := 50000;
+                UPDATE users SET balance = v_balance WHERE user_id = v_user_id;
+                COMMIT; 
+                END IF;
+                
             EXCEPTION WHEN NO_DATA_FOUND THEN RETURN; END;
     
-            -- !!! ОЧИСТКА: Размораживаем средства перед ходом
             clean_old_bot_orders(v_user_id);
-            -- Обновляем баланс после очистки
             SELECT balance INTO v_balance FROM users WHERE user_id = v_user_id;
     
     
@@ -176,54 +185,85 @@ END pkg_market_bots;
                 SELECT quantity_owned INTO v_owned_stocks 
                 FROM portfolios WHERE user_id = v_user_id AND company_id = v_company_id;
             EXCEPTION WHEN NO_DATA_FOUND THEN v_owned_stocks := 0; END;
-    
+            
+            -- Параметры настроения
+            v_market_mood := DBMS_RANDOM.VALUE(-0.1, 1);   -- Настроение рынка
+            v_risk_factor := DBMS_RANDOM.VALUE(0.2, 0.9);
+            
+            -- Skew определяет разброс цен
+            v_price_skew  := v_volatility * DBMS_RANDOM.VALUE(0.1, 1.2);
             -- 4. Стратегия (BUY/SELL)
             IF v_owned_stocks = 0 THEN
-                v_action := 'BUY';
-            ELSIF v_balance < 500 THEN
-                v_action := 'SELL';
-            ELSE
-                IF DBMS_RANDOM.VALUE > 0.5 THEN v_action := 'BUY'; ELSE v_action := 'SELL'; END IF;
-            END IF;
+        -- Если акций нет, покупаем только если настроение не "депрессивное" (> 0.2)
+        IF v_market_mood > 0.2 THEN v_action := 'BUY'; ELSE RETURN; END IF;
+    ELSE
+        -- Если акции есть:
+        -- 1. Паника (< 0.35) -> SELL
+        -- 2. Эйфория (> 0.65) + Есть деньги -> BUY
+        -- 3. Нейтрально -> 50/50
+        IF v_market_mood < 0.35 THEN
+            v_action := 'SELL';
+            v_risk_factor := 1.0; -- ПРИ ПАНИКЕ СЛИВАЕМ ВСЁ (Risk Factor повышается до максимума)
+        ELSIF v_market_mood > 0.65 AND v_balance > v_current_price * 10 THEN
+            v_action := 'BUY';
+        ELSE
+            IF DBMS_RANDOM.VALUE > 0.5 THEN v_action := 'BUY'; ELSE v_action := 'SELL'; END IF;
+        END IF;
+    END IF;
     
             -- 5. ЦЕНООБРАЗОВАНИЕ (Строго внутри волатильности)
             -- Рассчитываем границы, которые примет движок
-            v_min_price := v_current_price * (1 - v_volatility);
-            v_max_price := v_current_price * (1 + v_volatility);
+            v_min_allowed := v_current_price * (1 - v_volatility);
+            v_max_allowed := v_current_price * (1 + v_volatility);
+                
     
-            -- Бот выбирает цену внутри этого диапазона
-            -- Немного смещаем вероятность:
-            -- Если BUY -> стремится купить дешевле (ближе к min)
-            -- Если SELL -> стремится продать дороже (ближе к max)
             IF v_action = 'BUY' THEN
-                -- Цена от Min до Current (иногда чуть выше Current для агрессии)
-                v_limit_price := DBMS_RANDOM.VALUE(v_min_price, v_current_price * 1.01);
-            ELSE
-                -- Цена от Current до Max (иногда чуть ниже Current для быстрого слива)
-                v_limit_price := DBMS_RANDOM.VALUE(v_current_price * 0.99, v_max_price);
-            END IF;
-            
-            v_limit_price := ROUND(v_limit_price, 2);
-            IF v_limit_price <= 0.01 THEN v_limit_price := 0.01; END IF;
+        -- BUY STRATEGY
+        IF v_market_mood > 0.8 THEN
+            -- FOMO (Fear Of Missing Out): Покупаем агрессивно ВЫШЕ рынка
+            -- Цена = Current + Skew (сдвиг вверх)
+            v_limit_price := v_current_price * (1 + v_price_skew);
+        ELSE
+            -- Обычная покупка: пытаемся купить чуть дешевле или по рынку
+            v_limit_price := v_current_price * (1 + DBMS_RANDOM.VALUE(-0.01, v_price_skew/2));
+        END IF;
+        
+        IF v_limit_price > v_max_allowed THEN v_limit_price := v_max_allowed; END IF;
+
+    ELSE 
+        -- SELL STRATEGY
+        IF v_market_mood < 0.3 THEN
+            -- PANIC DUMP: Продаем агрессивно НИЖЕ рынка
+            -- Цена = Current - Skew (сдвиг вниз)
+            -- Чем сильнее паника, тем больше Skew
+            v_limit_price := v_current_price * (1 - (v_price_skew * 1.5)); 
+        ELSE
+            -- Обычная продажа: чуть дороже или по рынку
+            v_limit_price := v_current_price * (1 - DBMS_RANDOM.VALUE(-0.01, v_price_skew/2));
+        END IF;
+
+        IF v_limit_price < v_min_allowed THEN v_limit_price := v_min_allowed; END IF;
+    END IF;
     
-            -- 6. Объем
-            IF v_action = 'BUY' THEN
-                IF v_balance > v_limit_price THEN
-                    -- Тратим 5-20% бюджета
-                    v_qty := FLOOR((v_balance * DBMS_RANDOM.VALUE(0.05, 0.20)) / v_limit_price);
-                ELSE v_qty := 0; END IF;
-            ELSE
-                -- Продаем 10-50% акций
-                v_qty := CEIL(v_owned_stocks * DBMS_RANDOM.VALUE(0.1, 0.5));
-            END IF;
-    
-            IF v_qty < 1 THEN v_qty := 1; END IF;
-            
-            -- Финальная проверка на платежеспособность
-            IF v_action = 'BUY' AND (v_qty * v_limit_price) > v_balance THEN
-                 v_qty := FLOOR(v_balance / v_limit_price);
-            END IF;
-    
+    v_limit_price := ROUND(v_limit_price, 2);
+    IF v_limit_price <= 0.01 THEN v_limit_price := 0.01; END IF;
+        IF v_action = 'BUY' THEN
+        IF v_balance > v_limit_price THEN
+            -- Используем Risk Factor: тратим от 20% до 90% баланса
+            v_qty := FLOOR((v_balance * v_risk_factor) / v_limit_price);
+        ELSE v_qty := 0; END IF;
+    ELSE
+        -- SELL
+        -- Используем Risk Factor: продаем от 20% до 100% портфеля
+        -- (При панике v_risk_factor был выставлен в 1.0 выше)
+        v_qty := CEIL(v_owned_stocks * v_risk_factor);
+    END IF;
+
+    -- Санити-чеки
+    IF v_qty < 1 THEN v_qty := 1; END IF;
+    IF v_action = 'BUY' AND (v_qty * v_limit_price) > v_balance THEN
+         v_qty := FLOOR(v_balance / v_limit_price);
+    END IF;
             -- 7. Размещаем ордер
             IF v_qty > 0 THEN
                 stock_admin.pkg_trading_user.place_order(
@@ -250,19 +290,13 @@ END pkg_market_bots;
             perform_issuer_maintenance();
     
             -- 2. Боты торгуют
-            FOR i IN 1..5 LOOP -- Увеличили активность до 15 действий за такт
+            FOR i IN 1..15 LOOP -- Увеличили активность до 15 действий за такт
                 perform_bot_action();
             END LOOP;
             
             COMMIT;
         END job_runner;
-    
-        -- ==========================================
-        -- УПРАВЛЕНИЕ (Start/Stop/Status/Setup/Cleanup)
-        -- ==========================================
-        -- (Этот код остается без изменений из предыдущих ответов. 
-        -- Просто убедитесь, что setup_simulation_world использует правильный sector search)
-    
+
         PROCEDURE setup_simulation_world IS
             v_dummy_id NUMBER; v_dummy_str VARCHAR2(100); v_status VARCHAR2(50); v_msg VARCHAR2(4000); v_price NUMBER; v_target_sector_id NUMBER;
         BEGIN
@@ -291,8 +325,6 @@ END pkg_market_bots;
             v_cnt NUMBER;
         BEGIN
             o_status:='SUCCESS'; o_message:='Running';
-            SELECT COUNT(*) INTO v_cnt FROM users WHERE username LIKE c_bot_prefix || '%';
-            IF v_cnt < 10 THEN setup_simulation_world(); END IF;
             
             SELECT COUNT(*) INTO v_cnt FROM user_scheduler_jobs WHERE job_name = c_job_name;
             IF v_cnt = 0 THEN
@@ -307,6 +339,23 @@ END pkg_market_bots;
                     comments        => 'Bot Trading Simulation'
                 );
             ELSE DBMS_SCHEDULER.enable(c_job_name); END IF;
+            SELECT COUNT(*) INTO v_cnt FROM user_scheduler_jobs WHERE job_name = c_wakeup_job_name;
+        IF v_cnt = 0 THEN
+            DBMS_SCHEDULER.create_job (
+                job_name        => c_wakeup_job_name,
+                job_type        => 'PLSQL_BLOCK',
+                -- Вызываем процедуру из пакета динамики
+                job_action      => 'BEGIN stock_admin.pkg_market_dynamics.wake_up_stagnant_market; END;',
+                start_date      => SYSTIMESTAMP,
+                -- Раз в минуту достаточно, чтобы "пнуть" заснувшие компании
+                repeat_interval => 'FREQ=MINUTELY; INTERVAL=1', 
+                enabled         => TRUE,
+                comments        => 'Market Volatility Injector'
+            );
+        ELSE 
+            DBMS_SCHEDULER.enable(c_wakeup_job_name); 
+        END IF;
+            
         EXCEPTION WHEN OTHERS THEN o_status:='ERROR'; o_message:=SQLERRM; END start_simulation;
     
         PROCEDURE stop_simulation (o_status OUT VARCHAR2, o_message OUT VARCHAR2) IS
@@ -321,6 +370,10 @@ END pkg_market_bots;
             BEGIN SELECT state INTO v_st FROM user_scheduler_jobs WHERE job_name=c_job_name;
             o_is_running := CASE WHEN v_st='RUNNING' OR v_st='SCHEDULED' THEN 1 ELSE 0 END;
             EXCEPTION WHEN NO_DATA_FOUND THEN o_is_running:=0; END;
+            
+            BEGIN 
+                DBMS_SCHEDULER.disable(c_wakeup_job_name); 
+            EXCEPTION WHEN OTHERS THEN NULL; END;
         END get_simulation_status;
     
         PROCEDURE cleanup_simulation IS
@@ -339,4 +392,4 @@ END pkg_market_bots;
     
         
     END pkg_market_bots;
-    /
+/

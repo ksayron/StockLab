@@ -1,5 +1,4 @@
 CREATE OR REPLACE PACKAGE pkg_trading_engine AS
-    -- Запускает поиск совпадений для конкретной компании
     PROCEDURE match_orders (
         p_company_id IN NUMBER
     );
@@ -121,7 +120,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_trading_engine AS
             SELECT current_price, volatility_factor INTO v_current_price, v_volatility
             FROM companies WHERE company_id = p_company_id;
         EXCEPTION WHEN NO_DATA_FOUND THEN
-            stock_admin.pkg_logger.log_error('pkg_trading_engine.match_orders', NULL, SQLCODE, 'Company not found: ' || p_company_id);
+            stock_admin.pkg_logger.log_error('pkg_trading_engine.match_orders', NULL, SQLCODE, 'Компания не найдена: ' || p_company_id);
             RETURN;
         END;
 

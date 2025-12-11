@@ -111,11 +111,24 @@ INSERT INTO roles (name) VALUES ('User');
 COMMIT;
 
 
--- 2. Индексы 
-CREATE INDEX idx_users_role ON users(role_id);
-CREATE INDEX idx_companies_sector ON companies(sector_id);
-CREATE INDEX idx_orders_user ON orders(user_id);
-CREATE INDEX idx_orders_company ON orders(company_id);
-CREATE INDEX idx_orders_status ON orders(status); -- Critical for the Matching Engine
-CREATE INDEX idx_trades_company ON trades(company_id);
-CREATE INDEX idx_log_company ON price_log(company_id);
+
+CREATE INDEX IDX_USERS_ROLE ON USERS(ROLE_ID)
+    TABLESPACE stocklab_index;
+
+CREATE INDEX IDX_COMPANIES_SECTOR ON COMPANIES(SECTOR_ID)
+    TABLESPACE stocklab_index;
+
+CREATE INDEX IDX_TRADES_COMP_TIME ON TRADES(COMPANY_ID, EXECUTED_AT)
+    TABLESPACE stocklab_index;
+
+CREATE INDEX IDX_LOG_COMP_TIME ON PRICE_LOG(COMPANY_ID, LOG_TIME)
+    TABLESPACE stocklab_index;
+
+CREATE INDEX IDX_COMPANIES_LAST_TRADE ON COMPANIES(LAST_TRADE_AT)
+    TABLESPACE stocklab_index;
+
+CREATE INDEX IDX_ORDERS_MATCHING ON ORDERS(COMPANY_ID, STATUS, TYPE, LIMIT_PRICE)
+    TABLESPACE stocklab_index;
+
+CREATE INDEX IDX_UNOTIF_USER_READ ON USER_NOTIFICATIONS(USER_ID, IS_READ)
+    TABLESPACE stocklab_index;

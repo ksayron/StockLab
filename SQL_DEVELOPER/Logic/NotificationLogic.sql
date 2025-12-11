@@ -17,8 +17,6 @@ CREATE TABLE user_notifications (
     CONSTRAINT pk_user_notif PRIMARY KEY (user_id, notification_id)
 );
 
--- Индексы для быстрого поиска непрочитанных
-CREATE INDEX idx_unotif_user_read ON user_notifications(user_id, is_read);
 
 CREATE OR REPLACE PACKAGE pkg_notifications AS
 
@@ -72,7 +70,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_notifications AS
     BEGIN
         o_status := 'SUCCESS';
         o_message := 'Уведомление отправлено';
-
+        
+        PRAGMA AUTONOMOUS_TRANSACTION;
         -- 1. Создаем тело уведомления
         INSERT INTO notifications (title, message, type)
         VALUES (p_title, p_message, p_type)

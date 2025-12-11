@@ -37,7 +37,6 @@ CREATE OR REPLACE PACKAGE BODY pkg_market_bots AS
         BEGIN
             SELECT sector_id INTO v_target_sector_id FROM sectors where name='TECH' FETCH FIRST 1 ROW ONLY;
         EXCEPTION WHEN NO_DATA_FOUND THEN
-            -- Создаем аварийный сектор
             stock_admin.pkg_market_admin.add_sector('Bot_Sector', 'Auto-generated', v_target_sector_id, v_status, v_msg);
             IF v_status = 'ERROR' THEN
                 stock_admin.pkg_logger.log_error('pkg_market_bots.setup', NULL, NULL, 'Critical: Failed to create sector: ' || v_msg);

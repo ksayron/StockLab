@@ -17,7 +17,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_market_dynamics AS
     c_vol_min CONSTANT NUMBER := 0.01; 
     c_vol_max CONSTANT NUMBER := 0.50; 
     c_stagnation_minutes CONSTANT NUMBER := 15; 
-    c_overheat_threshold CONSTANT NUMBER := 5; 
+    c_overheat_threshold CONSTANT NUMBER := 15; 
 
     -- ==========================================
     -- 1. ON TRADE EXECUTED

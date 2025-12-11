@@ -1,7 +1,7 @@
 CREATE OR REPLACE PACKAGE pkg_portfolio AS
 
     -- Константа
-    c_calc_interval CONSTANT INTERVAL DAY TO SECOND := INTERVAL '30' MINUTE;
+    c_calc_interval CONSTANT INTERVAL DAY TO SECOND := INTERVAL '1' DAY;
 
     -- Получить общую сводку
     PROCEDURE get_portfolio_summary (
@@ -32,20 +32,39 @@ CREATE OR REPLACE PACKAGE BODY pkg_portfolio AS
     FUNCTION get_historical_price(p_company_id NUMBER) RETURN NUMBER IS
         v_price NUMBER;
     BEGIN
-        SELECT price INTO v_price
-        FROM price_log
-        WHERE company_id = p_company_id
-          AND log_time <= SYSTIMESTAMP - c_calc_interval
-        ORDER BY log_time DESC
-        FETCH FIRST 1 ROW ONLY;
-        RETURN v_price;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            SELECT current_price INTO v_price FROM companies WHERE company_id = p_company_id;
+        -- 1. Ищем цену ровно 24 часа назад (или ранее)
+        BEGIN
+            SELECT price INTO v_price
+            FROM price_log
+            WHERE company_id = p_company_id
+              AND log_time <= SYSTIMESTAMP - c_calc_interval
+            ORDER BY log_time DESC
+            FETCH FIRST 1 ROW ONLY;
+            
             RETURN v_price;
+        EXCEPTION WHEN NO_DATA_FOUND THEN NULL; -- Идем дальше
+        END;
+
+        -- 2. Если за 24 часа нет, ищем САМУЮ ПЕРВУЮ запись (цена IPO)
+        -- Это покажет рост с начала времен, если компании всего пара часов
+        BEGIN
+            SELECT price INTO v_price
+            FROM price_log
+            WHERE company_id = p_company_id
+            ORDER BY log_time ASC
+            FETCH FIRST 1 ROW ONLY;
+            
+            RETURN v_price;
+        EXCEPTION WHEN NO_DATA_FOUND THEN NULL; -- Идем дальше
+        END;
+
+        -- 3. Если истории вообще нет, берем текущую
+        SELECT current_price INTO v_price FROM companies WHERE company_id = p_company_id;
+        RETURN v_price;
     END;
 
     -- SUMMARY
+    -- SUMMARY (Сводка)
     PROCEDURE get_portfolio_summary (
         p_user_id       IN  NUMBER,
         o_cash_balance  OUT NUMBER,
@@ -62,17 +81,14 @@ CREATE OR REPLACE PACKAGE BODY pkg_portfolio AS
         o_status := 'SUCCESS';
         o_message := 'ОК';
 
-        -- Проверка существования пользователя
+        -- 1. Баланс
         BEGIN
             SELECT balance INTO o_cash_balance FROM users WHERE user_id = p_user_id;
-        EXCEPTION
-            WHEN NO_DATA_FOUND THEN
-                o_status := 'ERROR';
-                o_message := 'Пользователь не найден';
-                RETURN;
+        EXCEPTION WHEN NO_DATA_FOUND THEN
+            o_status := 'ERROR'; o_message := 'Пользователь не найден'; RETURN;
         END;
 
-        -- Считаем стоимость акций
+        -- 2. Считаем портфель
         FOR r IN (SELECT company_id, quantity_owned FROM portfolios WHERE user_id = p_user_id) LOOP
             DECLARE
                 v_cur_price NUMBER;
@@ -88,22 +104,22 @@ CREATE OR REPLACE PACKAGE BODY pkg_portfolio AS
 
         o_stocks_value := v_current_stock_sum;
         o_total_equity := o_cash_balance + o_stocks_value;
+        o_change_abs   := v_current_stock_sum - v_old_stock_sum;
         
-        o_change_abs := v_current_stock_sum - v_old_stock_sum;
-        
-        IF v_old_stock_sum > 0 THEN
-            o_change_pct := (o_change_abs / v_old_stock_sum) * 100;
+        -- ЗАЩИТА ОТ ДЕЛЕНИЯ НА НОЛЬ (Overflow Fix)
+        IF v_old_stock_sum IS NULL OR v_old_stock_sum = 0 THEN
+            o_change_pct := 0; -- Если раньше было 0, то процент изменения считаем 0 (или можно 100, но 0 безопаснее)
         ELSE
-            o_change_pct := 0;
+            o_change_pct := ROUND((o_change_abs / v_old_stock_sum) * 100, 2);
         END IF;
 
     EXCEPTION
         WHEN OTHERS THEN
-            stock_admin.pkg_logger.log_error('pkg_portfolio.get_portfolio_summary', p_user_id, SQLCODE, SQLERRM);
+            stock_admin.pkg_logger.log_error('pkg_portfolio.summary', p_user_id, SQLCODE, SQLERRM);
             o_status := 'ERROR';
             o_message := 'Internal Server Error';
     END get_portfolio_summary;
-
+    
     -- ITEMS
     PROCEDURE get_portfolio_items (
         p_user_id IN  NUMBER,
