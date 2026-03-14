@@ -1,25 +1,18 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using StockLab.Repositories.Interfaces;
+using StockLab.Services;
 
 namespace StockLab.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AnalyticsController : ControllerBase
+    public class AnalyticsController(AnalyticsService analyticsService) : ControllerBase
     {
-        private readonly IAnalyticsRepository _repository;
-
-        public AnalyticsController(IAnalyticsRepository repository)
-        {
-            _repository = repository;
-        }
-
         [HttpGet("windrose")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetWindrose()
         {
-            var data = await _repository.GetWindroseDataAsync();
+            var data = await analyticsService.GetWindroseDataAsync();
             return Ok(new { success = true, data });
         }
 
@@ -27,14 +20,14 @@ namespace StockLab.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetHeatmap()
         {
-            var data = await _repository.GetMarketHeatmapAsync();
+            var data = await analyticsService.GetMarketHeatmapAsync();
             return Ok(new { success = true, data });
         }
 
         [HttpGet("top5")]
         public async Task<IActionResult> GetTop5()
         {
-            var data = await _repository.GetTopActiveCompaniesAsync();
+            var data = await analyticsService.GetTopActiveCompaniesAsync();
             return Ok(new { success = true, data });
         }
     }

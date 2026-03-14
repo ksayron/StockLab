@@ -1,0 +1,30 @@
+# Build outputs
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+.vs/
+
+# NuGet
+*.nupkg
+packages/
+
+# Node
+node_modules/
+dist/
+
+# Env / secrets
+appsettings.Production.json
+
+# Claude internal
+.claude/
+business_scenario.json
+DB_SQL/.idea/sqldialects.xml
+DB_SQL/.idea/modules.xml
+Docs/~$ст_задания_КучерукНиколайПетрович.docx
+DB_SQL/.idea/dataSources.xml
+DB_SQL/.idea/DB_SQL.iml
+DB_SQL/.idea/vcs.xml
+DB_SQL/.idea/.gitignore

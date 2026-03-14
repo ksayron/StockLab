@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'https://localhost:7207/api', // Проксируем через vite.config.ts или указываем полный URL
+  baseURL: 'http://localhost:5215/api',
   withCredentials: true, // ВАЖНО: Разрешает отправку кук
   headers: {
     'Content-Type': 'application/json',

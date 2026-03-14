@@ -30,7 +30,8 @@ const items = ref([
         label: 'Система',
         items: [
             { label: 'Импорт / Экспорт', icon: 'pi pi-database', command: () => router.push('/admin/data') },
-            { label: 'Логи ошибок', icon: 'pi pi-exclamation-circle', command: () => router.push('/admin/logs') }
+            { label: 'Логи ошибок', icon: 'pi pi-exclamation-circle', command: () => router.push('/admin/logs') },
+            { label: 'Hangfire Dashboard', icon: 'pi pi-server', command: () => window.open('http://localhost:5147/hangfire', '_blank') }
         ]
     }
 ]);
