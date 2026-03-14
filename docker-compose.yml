@@ -1,0 +1,40 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: stocklab_db
+    environment:
+      POSTGRES_DB: stocklab
+      POSTGRES_USER: stocklab
+      POSTGRES_PASSWORD: stocklab123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stocklab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  hangfire-postgres:
+    image: postgres:16
+    container_name: stocklab_hangfire_db
+    environment:
+      POSTGRES_DB: stocklab_hangfire
+      POSTGRES_USER: stocklab
+      POSTGRES_PASSWORD: stocklab123
+    ports:
+      - "5433:5432"
+    volumes:
+      - hangfire_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stocklab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  hangfire_data:

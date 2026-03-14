@@ -1,39 +1,24 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Oracle.ManagedDataAccess.Client;
 using StockLab.Models.DTOs;
-using StockLab.Repositories.Interfaces;
+using StockLab.Services;
 
 namespace StockLab.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class SectorController : ControllerBase
+    public class SectorController(SectorService sectorService) : ControllerBase
     {
-        private readonly ISectorRepository _repository;
-
-        public SectorController(ISectorRepository repository)
-        {
-            _repository = repository;
-        }
-
-        // ==========================================
-        // PUBLIC (Доступно всем, даже без токена)
-        // ==========================================
-
         [HttpGet]
         [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             try
             {
-                var sectors = await _repository.GetAllSectorsAsync();
+                var sectors = await sectorService.GetAllSectorsAsync();
                 return Ok(new ResponseWrapper(true, "Сектора получены", sectors));
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ResponseWrapper(false, ex.Message));
-            }
+            catch (Exception ex) { return StatusCode(500, new ResponseWrapper(false, ex.Message)); }
         }
 
         [HttpGet("{id}")]
@@ -42,25 +27,12 @@ namespace StockLab.Controllers
         {
             try
             {
-                var sector = await _repository.GetSectorByIdAsync(id);
-                if (sector == null)
-                    return NotFound(new ResponseWrapper(false, "Сектор не найден"));
-
+                var sector = await sectorService.GetByIdAsync(id);
+                if (sector == null) return NotFound(new ResponseWrapper(false, "Сектор не найден"));
                 return Ok(new ResponseWrapper(true, "Сектор найден", sector));
             }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new ResponseWrapper(false, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ResponseWrapper(false, ex.Message));
-            }
+            catch (Exception ex) { return StatusCode(500, new ResponseWrapper(false, ex.Message)); }
         }
-
-        // ==========================================
-        // ADMIN (Только роль Admin)
-        // ==========================================
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
@@ -68,18 +40,12 @@ namespace StockLab.Controllers
         {
             try
             {
-                var newId = await _repository.AddSectorAsync(dto.Name, dto.Description);
+                var newId = await sectorService.AddSectorAsync(dto.Name, dto.Description);
                 return CreatedAtAction(nameof(GetById), new { id = newId },
                     new ResponseWrapper(true, "Сектор успешно создан", newId));
             }
-            catch (InvalidOperationException ex) // "Имя занято"
-            {
-                return Conflict(new ResponseWrapper(false, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ResponseWrapper(false, ex.Message));
-            }
+            catch (InvalidOperationException ex) { return Conflict(new ResponseWrapper(false, ex.Message)); }
+            catch (Exception ex) { return StatusCode(500, new ResponseWrapper(false, ex.Message)); }
         }
 
         [HttpPut("{id}")]
@@ -88,21 +54,12 @@ namespace StockLab.Controllers
         {
             try
             {
-                await _repository.UpdateSectorAsync(id, dto.Name, dto.Description);
+                await sectorService.UpdateSectorAsync(id, dto.Name, dto.Description);
                 return Ok(new ResponseWrapper(true, "Сектор успешно обновлен"));
             }
-            catch (KeyNotFoundException ex) // "Не найден"
-            {
-                return NotFound(new ResponseWrapper(false, ex.Message));
-            }
-            catch (InvalidOperationException ex) // "Имя занято"
-            {
-                return Conflict(new ResponseWrapper(false, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ResponseWrapper(false, ex.Message));
-            }
+            catch (KeyNotFoundException ex) { return NotFound(new ResponseWrapper(false, ex.Message)); }
+            catch (InvalidOperationException ex) { return Conflict(new ResponseWrapper(false, ex.Message)); }
+            catch (Exception ex) { return StatusCode(500, new ResponseWrapper(false, ex.Message)); }
         }
 
         [HttpDelete("{id}")]
@@ -111,21 +68,12 @@ namespace StockLab.Controllers
         {
             try
             {
-                await _repository.DeleteSectorAsync(id);
+                await sectorService.DeleteSectorAsync(id);
                 return Ok(new ResponseWrapper(true, "Сектор успешно удален"));
             }
-            catch (KeyNotFoundException ex) // "Не найден"
-            {
-                return NotFound(new ResponseWrapper(false, ex.Message));
-            }
-            catch (InvalidOperationException ex) // "Содержит компании" (FK)
-            {
-                return BadRequest(new ResponseWrapper(false, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ResponseWrapper(false, ex.Message));
-            }
+            catch (KeyNotFoundException ex) { return NotFound(new ResponseWrapper(false, ex.Message)); }
+            catch (InvalidOperationException ex) { return BadRequest(new ResponseWrapper(false, ex.Message)); }
+            catch (Exception ex) { return StatusCode(500, new ResponseWrapper(false, ex.Message)); }
         }
     }
 }
