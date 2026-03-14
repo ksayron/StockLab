@@ -81,8 +81,6 @@ namespace StockLab
 
                                     var principal = handler.ValidateToken(token, context.Options.TokenValidationParameters, out var validatedToken);
 
-                                    Console.WriteLine("[SUCCESS] Ручная валидация прошла успешно!");
-
                                     context.Principal = principal;
                                     context.Success();
 
@@ -128,6 +126,8 @@ namespace StockLab
             builder.Services.AddScoped<IPortfolioRepository, OraclePortfolioRepository>();
             builder.Services.AddScoped<IAdminRepository, OracleAdminRepository>();
             builder.Services.AddScoped<INotificationsRepository, OracleNotificationsRepository>();
+            builder.Services.AddScoped<IBotRepository, OracleBotRepository>();
+            builder.Services.AddScoped<IAnalyticsRepository, OracleAnalyticsRepository>();
 
             builder.Services.AddCors(options =>
             {
@@ -144,6 +144,7 @@ namespace StockLab
             builder.Services.AddSingleton<ConnectionManager>();
             //builder.Services.AddHostedService<MarketBackgroundService>();
             builder.Services.AddHostedService<NotificationBackgroundService>();
+            builder.Services.AddHostedService<AnalyticsBroadcastService>();
 
             var app = builder.Build();
 
@@ -160,6 +161,7 @@ namespace StockLab
             app.UseAuthorization();
             //app.MapHub<MarketHub>("/hubs/market");
             app.MapHub<NotificationHub>("/hubs/notifications");
+            app.MapHub<DashboardHub>("/hubs/dashboard");
 
             app.UseHttpsRedirection();
 

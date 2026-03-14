@@ -100,6 +100,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_trading_engine AS
               AND b.type = 'BUY' AND b.status IN ('OPEN', 'PARTIAL')
               AND s.type = 'SELL' AND s.status IN ('OPEN', 'PARTIAL')
               AND b.limit_price >= s.limit_price
+              AND b.user_id != s.user_id
             ORDER BY 
                 b.limit_price DESC, s.limit_price ASC, b.created_at ASC
             FOR UPDATE SKIP LOCKED;

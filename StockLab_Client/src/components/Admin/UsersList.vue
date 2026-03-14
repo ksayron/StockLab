@@ -1,16 +1,3 @@
-Это ключевой компонент админ-панели. Мы создадим таблицу с расширенным функционалом управления пользователями.
-
-Используем:
-
-DataTable с фильтрацией (поиск по имени/email).
-
-ConfirmPopup для опасных действий (бан).
-
-Dialog для форм создания админа и изменения баланса.
-
-1. Компонент src/views/admin/UsersList.vue
-Code snippet
-
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue';
 import { useToast } from 'primevue/usetoast';

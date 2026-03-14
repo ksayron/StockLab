@@ -22,10 +22,15 @@ const confirm = useConfirm();
 
 const companies = ref([]);
 const loading = ref(true);
-const dialogVisible = ref(false);
+const dialogVisible = ref(false); // Для IPO
 const formLoading = ref(false);
 
-// Форма (Только для создания IPO, редактирование можно упростить или не делать тут)
+// --- ПЕРЕМЕННЫЕ ДЛЯ РЕДАКТИРОВАНИЯ ---
+const editDialogVisible = ref(false);
+const editLoading = ref(false);
+const editingId = ref<number | null>(null);
+
+// Форма IPO
 const form = reactive({
     name: '',
     ticker: '',
@@ -36,18 +41,26 @@ const form = reactive({
     totalShares: 100000
 });
 
+// Форма редактирования (DTO: sectorId, name, description, volatility)
+const editForm = reactive({
+    name: '',
+    description: '',
+    sectorId: null as number | null,
+    volatility: 0
+});
+
 const loadCompanies = async () => {
     loading.value = true;
     try {
-        const res = await api.get('/Company'); // Получаем все
+        const res = await api.get('/Company');
         companies.value = res.data.data;
     } finally {
         loading.value = false;
     }
 };
 
+// --- ЛОГИКА IPO ---
 const openNew = () => {
-    // Сброс формы
     form.name = ''; form.ticker = ''; form.description = '';
     form.sectorId = null; form.initPrice = 100; 
     form.volatility = 0.1; form.totalShares = 100000;
@@ -60,7 +73,7 @@ const createIPO = async () => {
     formLoading.value = true;
     try {
         await api.post('/Company', form);
-        toast.add({ severity: 'success', summary: 'IPO Запущено', detail: 'Компания создана и акции выставлены', life: 3000 });
+        toast.add({ severity: 'success', summary: 'IPO Запущено', detail: 'Компания создана', life: 3000 });
         dialogVisible.value = false;
         loadCompanies();
     } catch (e: any) {
@@ -70,6 +83,43 @@ const createIPO = async () => {
     }
 };
 
+// --- ЛОГИКА РЕДАКТИРОВАНИЯ ---
+const openEdit = (company: any) => {
+    editingId.value = company.id;
+    // Заполняем форму текущими данными
+    editForm.name = company.name;
+    editForm.description = company.description;
+    editForm.volatility = company.volatility;
+    editForm.sectorId = company.sectorId; 
+    
+    editDialogVisible.value = true;
+};
+
+const saveEdit = async () => {
+    if (!editingId.value) return;
+    
+    editLoading.value = true;
+    try {
+        const payload = {
+            sectorId: editForm.sectorId,
+            name: editForm.name,
+            description: editForm.description,
+            volatility: editForm.volatility
+        };
+        
+        await api.put(`/Company/${editingId.value}`, payload);
+        
+        toast.add({ severity: 'success', summary: 'Успех', detail: 'Данные компании обновлены', life: 3000 });
+        editDialogVisible.value = false;
+        loadCompanies(); // Обновляем список
+    } catch (e: any) {
+        toast.add({ severity: 'error', summary: 'Ошибка', detail: e.response?.data?.message || 'Не удалось сохранить', life: 3000 });
+    } finally {
+        editLoading.value = false;
+    }
+};
+
+// --- ЛОГИКА УДАЛЕНИЯ ---
 const delistCompany = (event: any, id: number) => {
     confirm.require({
         target: event.currentTarget,
@@ -90,7 +140,7 @@ const delistCompany = (event: any, id: number) => {
 
 onMounted(() => {
     loadCompanies();
-    sectorStore.fetchSectors(); // Подгружаем сектора для селекта
+    sectorStore.fetchSectors();
 });
 </script>
 
@@ -113,17 +163,28 @@ onMounted(() => {
                         <Tag :value="data.status" :severity="data.status === 'ACTIVE' ? 'success' : 'danger'" />
                     </template>
                 </Column>
-                <Column header="Действия">
+                <Column header="Действия" style="width: 180px">
                     <template #body="{ data }">
-                        <Button 
-                            v-if="data.status === 'ACTIVE'"
-                            icon="pi pi-ban" 
-                            label="Делистинг" 
-                            severity="danger" 
-                            size="small" 
-                            text 
-                            @click="delistCompany($event, data.id)" 
-                        />
+                        <div class="flex gap-2">
+                            <Button 
+                                icon="pi pi-pencil" 
+                                severity="secondary" 
+                                size="small" 
+                                text 
+                                aria-label="Edit"
+                                @click="openEdit(data)" 
+                            />
+
+                            <Button 
+                                v-if="data.status === 'ACTIVE'"
+                                icon="pi pi-ban" 
+                                label="Делистинг" 
+                                severity="danger" 
+                                size="small" 
+                                text 
+                                @click="delistCompany($event, data.id)" 
+                            />
+                        </div>
                     </template>
                 </Column>
             </DataTable>
@@ -173,5 +234,52 @@ onMounted(() => {
                 </div>
             </div>
         </Dialog>
+
+        <Dialog v-model:visible="editDialogVisible" modal header="Редактирование компании" class="w-full max-w-lg">
+            
+            <div class="flex flex-col gap-4 pt-2">
+                <div class="flex flex-col gap-2">
+                    <label class="font-bold">Название</label>
+                    <InputText v-model="editForm.name" />
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="font-bold">Сектор</label>
+                    <Select 
+                        v-model="editForm.sectorId" 
+                        :options="sectorStore.sectors" 
+                        optionLabel="name" 
+                        optionValue="id" 
+                        placeholder="Выберите сектор" 
+                        class="w-full" 
+                    />
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="font-bold">Описание</label>
+                    <Textarea v-model="editForm.description" rows="4" />
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="font-bold">Волатильность (0.0 - 1.0)</label>
+                    <InputNumber 
+                        v-model="editForm.volatility" 
+                        :min="0" :max="1" 
+                        :minFractionDigits="2" :maxFractionDigits="4" 
+                        :step="0.01" 
+                        showButtons 
+                    />
+                    <small class="text-gray-500">
+                        Влияет на амплитуду колебания цены при симуляции.
+                    </small>
+                </div>
+
+                <div class="flex justify-end gap-2 mt-4">
+                    <Button label="Отмена" text severity="secondary" @click="editDialogVisible = false" />
+                    <Button label="Сохранить изменения" icon="pi pi-save" :loading="editLoading" @click="saveEdit" />
+                </div>
+            </div>
+        </Dialog>
+
     </div>
 </template>

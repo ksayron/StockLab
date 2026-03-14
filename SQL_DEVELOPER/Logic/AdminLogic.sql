@@ -295,6 +295,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_tools AS
                 r.name as role_name, u.created_at
             FROM users u
             JOIN roles r ON u.role_id = r.role_id
+            WHERE u.role_id = 1 or u.role_id = 2
             ORDER BY u.created_at DESC;
     EXCEPTION
         WHEN OTHERS THEN

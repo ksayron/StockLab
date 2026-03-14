@@ -164,13 +164,15 @@ namespace StockLab.Controllers
 
         // POST /api/admin/import
         [HttpPost("import")]
+        [DisableRequestSizeLimit] // Отключает лимит на тело запроса (Kestrel)
+        [RequestFormLimits(MultipartBodyLengthLimit = 524288000)]
         public async Task<IActionResult> ImportData(IFormFile file)
         {
             if (file == null || file.Length == 0)
-                return BadRequest(new { success = false, message = "File is empty" });
+                return BadRequest(new { success = false, message = "Файл пустой" });
 
             if (!file.FileName.EndsWith(".json"))
-                return BadRequest(new { success = false, message = "Only .json files allowed" });
+                return BadRequest(new { success = false, message = "Поддерживается только .json" });
 
             try
             {
@@ -181,7 +183,7 @@ namespace StockLab.Controllers
                 // 2. Отправляем в БД
                 await _repository.ImportDatabaseJsonAsync(jsonContent);
 
-                return Ok(new { success = true, message = "Database imported successfully" });
+                return Ok(new { success = true, message = "Импорт успешен" });
             }
             catch (Exception ex)
             {
@@ -251,29 +253,6 @@ namespace StockLab.Controllers
             {
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
-        }
-        // GET /api/admin/simulation
-        [HttpGet("simulation")]
-        public async Task<IActionResult> GetSimStatus()
-        {
-            try
-            {
-                bool isRunning = await _repository.GetSimulationStatusAsync();
-                return Ok(new { success = true, isRunning });
-            }
-            catch (Exception ex) { return StatusCode(500, new { success = false, message = ex.Message }); }
-        }
-
-        // POST /api/admin/simulation
-        [HttpPost("simulation")]
-        public async Task<IActionResult> ToggleSim([FromBody] bool enable)
-        {
-            try
-            {
-                await _repository.ToggleSimulationAsync(enable);
-                return Ok(new { success = true, message = enable ? "Simulation Started" : "Simulation Stopped" });
-            }
-            catch (Exception ex) { return StatusCode(500, new { success = false, message = ex.Message }); }
         }
     }   
 }

@@ -11,6 +11,9 @@ import SectorsLists from '@/components/Admin/SectorsLists.vue'
 import DataTools from '@/components/Admin/DataTools.vue'
 import LogsViewer from '@/components/Admin/LogsViewer.vue'
 import CompaniesList from '@/components/Admin/CompaniesList.vue'
+import BotsList from '@/views/Bots/BotsList.vue'
+import BotDetail from '@/views/Bots/BotDetail.vue'
+import AnalyticsView from '@/views/Analytics/AnalyticsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -21,26 +24,30 @@ const router = createRouter({
     { path: '/company/:id', name: 'company', component: CompamyView },
     { path: '/portfolio', name: 'portfolio', component: PortfolioView , meta:{ requiresAuth:true}},
     { path: '/orders', name: 'orders', component: OrderView , meta:{ requiresAuth:true}},
+    { path: '/analytics', name: 'analytics', component: AnalyticsView , meta:{ requiresAuth:true, role:'Admin'}},
     {
         path: '/admin',
         component: RouterView,
         meta: { requiresAuth: true, role:'Admin' },
         children: [
             { path: 'users', name: 'admin-users', component: UsersList },
+            { path: 'bots', name: 'admin-bots', component: BotsList },
+            { path: 'bot-detail/:id', name: 'admin-bot-detail', component: BotDetail },
             { path: 'sectors', name: 'admin-sectors', component: SectorsLists },
             { path: 'companies', name: 'admin-companies', component: CompaniesList },
             { path: 'data', name: 'admin-data', component: DataTools },
             { path: 'logs', name: 'admin-logs', component: LogsViewer },
         ]
     }
-    // Другие роуты...
   ],
 })
 
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
+  
+  const isCompanyPage = to.path.startsWith('/company/')
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  if (to.meta.requiresAuth && !auth.isAuthenticated && !isCompanyPage) {
     next('/login')
   } else {
     next()

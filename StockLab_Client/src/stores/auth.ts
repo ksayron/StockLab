@@ -18,7 +18,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 1. Проверка авторизации при загрузке (Auto-login)
   async function checkAuth() {
-    if (user.value) return // Уже загружен
 
     isLoading.value = true
     try {

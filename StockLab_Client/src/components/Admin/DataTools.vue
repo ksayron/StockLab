@@ -91,7 +91,7 @@ const onFileSelect = async (event: any) => {
                     mode="basic" 
                     name="file" 
                     accept=".json" 
-                    :maxFileSize="100000000" 
+                    :maxFileSize="400000000" 
                     @select="onFileSelect"
                     :auto="true"
                     chooseLabel="Загрузить файл"

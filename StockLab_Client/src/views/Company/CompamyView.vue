@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import anychart from 'anychart'
 
@@ -18,7 +19,7 @@ import TradeDialog from '@/components/TradeDialog.vue'
 const route = useRoute()
 const toast = useToast()
 const companyId = parseInt(route.params.id as string)
-
+const authStore = useAuthStore()
 // --- ДАННЫЕ ---
 const company = ref<any>(null)
 const userShares = ref(0)
@@ -36,6 +37,8 @@ const showTradeDialog = ref(false)
 const tradeType = ref<'BUY' | 'SELL'>('BUY')
 const tradeForm = ref({ quantity: 1, price: 0 })
 const tradeLoading = ref(false)
+
+  
 
 // --- ХЕЛПЕР ДЛЯ ДАТ ---
 const parseUtcDate = (dateStr: string): number => {

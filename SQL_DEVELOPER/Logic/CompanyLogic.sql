@@ -207,14 +207,20 @@ CREATE OR REPLACE PACKAGE BODY pkg_companies_admin AS
             p_sector_id, p_name, UPPER(p_ticker), p_description, p_init_price, p_volatility, 'ACTIVE', p_total_shares
         ) RETURNING company_id INTO o_company_id;
         
-        -- 2. Логика Эмитента
+        -- 2. Логика Эмитента (Refactored)
         v_issuer_name := 'ISSUER_' || UPPER(p_ticker);
         
         BEGIN
-            SELECT role_id INTO v_role_id FROM roles WHERE name = 'User' FETCH FIRST 1 ROWS ONLY;
+            -- Ищем роль ISSUER
+            SELECT role_id INTO v_role_id FROM roles WHERE name = 'Issuer' FETCH FIRST 1 ROWS ONLY;
         EXCEPTION WHEN NO_DATA_FOUND THEN
-            -- Fallback
-            SELECT role_id INTO v_role_id FROM roles FETCH FIRST 1 ROWS ONLY;
+            -- Fallback на USER, если роль Issuer не создана
+            BEGIN
+                SELECT role_id INTO v_role_id FROM roles WHERE name = 'User' FETCH FIRST 1 ROWS ONLY;
+            EXCEPTION WHEN NO_DATA_FOUND THEN
+                 -- Fallback на любую роль (крайний случай)
+                 SELECT role_id INTO v_role_id FROM roles FETCH FIRST 1 ROWS ONLY;
+            END;
         END;
         
         INSERT INTO users (
@@ -237,12 +243,11 @@ CREATE OR REPLACE PACKAGE BODY pkg_companies_admin AS
         COMMIT;
 
     EXCEPTION
-        WHEN DUP_VAL_ON_INDEX THEN -- Ловим ORA-00001
+        WHEN DUP_VAL_ON_INDEX THEN
             ROLLBACK;
             o_status := 'ERROR';
-            o_message := 'Имя компании или Тикер уже заняты';
+            o_message := 'Имя компании, Тикер или Имя эмитента уже заняты';
         
-        -- Ловим FK (сектор не найден) - ORA-02291
         WHEN OTHERS THEN
             ROLLBACK;
             IF SQLCODE = -2291 THEN
@@ -251,10 +256,10 @@ CREATE OR REPLACE PACKAGE BODY pkg_companies_admin AS
             ELSE
                 stock_admin.pkg_logger.log_error('pkg_companies_admin.add_company', NULL, SQLCODE, SQLERRM);
                 o_status := 'ERROR';
-                o_message := 'Internal Server Error';
+                o_message := 'Internal Server Error: ' || SQLERRM;
             END IF;
     END add_company;
-
+    
     PROCEDURE update_company (
         p_company_id  IN NUMBER,
         p_sector_id   IN NUMBER,
@@ -338,6 +343,4 @@ GRANT EXECUTE ON pkg_companies_view TO stock_user;
 GRANT EXECUTE ON pkg_companies_view TO stock_guest;
 GRANT EXECUTE ON pkg_companies_view TO stock_admin;
 
-
 GRANT EXECUTE ON pkg_market_admin TO stock_admin;
-commit;

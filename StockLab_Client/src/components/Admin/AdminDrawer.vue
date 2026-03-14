@@ -21,8 +21,9 @@ const items = ref([
         label: 'Управление',
         items: [
             { label: 'Пользователи', icon: 'pi pi-users', command: () => router.push('/admin/users') },
+            { label: 'Боты', icon: 'pi pi-microchip-ai', command: () => router.push('/admin/bots') },
             { label: 'Сектора', icon: 'pi pi-tags', command: () => router.push('/admin/sectors') },
-            { label: 'Компании', icon: 'pi pi-building', command: () => router.push('/admin/companies') } // Можно переиспользовать главную с кнопками админа
+            { label: 'Компании', icon: 'pi pi-building', command: () => router.push('/admin/companies') }
         ]
     },
     {
@@ -81,11 +82,6 @@ watch(() => visible.value, (newVal) => {
             </div>
 
             <Menu :model="items" class="w-full !border-none" />
-            <div class="flex items-center justify-between my-3">
-                    <span class="text-sm text-gray-500">Активность ботов</span>
-                    <InputSwitch v-model="isSimRunning" @change="toggleSim" :disabled="simLoading" />
-            </div>
-
             <div class="mt-auto">
                 <Button label="Выйти из админки" severity="secondary" text class="w-full" @click="visible = false" />
             </div>

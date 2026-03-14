@@ -1,219 +1,184 @@
-select * from companies;
 SET SERVEROUTPUT ON;
 
 DECLARE
-    -- ID для секторов
-    v_sec_tech_id    NUMBER;
-    v_sec_energy_id  NUMBER;
-    v_sec_finance_id NUMBER;
-
-    -- ID для компаний
-    v_comp1_id NUMBER; -- Tech (Apple-like)
-    v_comp2_id NUMBER; -- Tech (Volatile startup)
-    v_comp3_id NUMBER; -- Energy (Stable)
-    v_comp4_id NUMBER; -- Finance (Bank)
-    v_comp5_id NUMBER; -- To be Delisted
-
-    -- Переменные для чтения курсоров
-    c_cursor     SYS_REFCURSOR;
-    r_id         NUMBER;
-    r_name       VARCHAR2(100);
-    r_ticker     VARCHAR2(10);
-    r_price      NUMBER;
-    r_sec_name   VARCHAR2(100);
-    r_volatility NUMBER;
-    r_status     VARCHAR2(20);
-
-BEGIN
-    DBMS_OUTPUT.PUT_LINE('=== НАЧАЛО ТЕСТИРОВАНИЯ COMPANIES PACKAGES ===');
-
-    -- ====================================================
-    -- 1. ПОДГОТОВКА (Создаем Сектора)
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 1. Создание тестовых секторов ---');
+    -- Переменные для результатов
+    v_company_id    NUMBER;
+    v_sector_id     NUMBER;
+    v_status        VARCHAR2(50);
+    v_message       VARCHAR2(4000);
+    v_cursor        SYS_REFCURSOR;
     
-    -- Используем существующий пакет секторов
-    stock_admin.pkg_market_admin.add_sector('Test Tech', 'High growth', v_sec_tech_id);
-    stock_admin.pkg_market_admin.add_sector('Test Energy', 'Stable income', v_sec_energy_id);
-    stock_admin.pkg_market_admin.add_sector('Test Finance', 'Money movers', v_sec_finance_id);
+    -- Тестовые данные (генерируем уникальные, чтобы можно было запускать скрипт многократно)
+    v_timestamp     VARCHAR2(20) := TO_CHAR(SYSDATE, 'HH24MISS');
+    v_name          VARCHAR2(100) := 'TestCorp_' || v_timestamp;
+    v_ticker        VARCHAR2(10)  := 'T' || SUBSTR(v_timestamp, -4); -- Тикер макс 5-10 символов
+    v_desc          VARCHAR2(200) := 'IPO Test Description';
+    v_init_price    NUMBER := 150.00;
+    v_volatility    NUMBER := 0.15;
+    v_shares        NUMBER := 1000000;
     
-    DBMS_OUTPUT.PUT_LINE('Сектора созданы: Tech='||v_sec_tech_id||', Energy='||v_sec_energy_id||', Finance='||v_sec_finance_id);
-
-    -- ====================================================
-    -- 2. НАПОЛНЕНИЕ (Создаем 5 Компаний)
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 2. Создание 5 компаний ---');
-
-    -- 1. Alpha Tech (Expensive, Low Volatility)
-    stock_admin.pkg_companies_admin.add_company(
-        p_sector_id => v_sec_tech_id, p_name => 'Alpha Tech', p_ticker => 'ALPH', 
-        p_description => 'Big Tech', p_init_price => 150.00, p_volatility => 0.05, 
-        o_company_id => v_comp1_id
-    );
-
-    -- 2. Beta Startup (Cheap, High Volatility)
-    stock_admin.pkg_companies_admin.add_company(
-        p_sector_id => v_sec_tech_id, p_name => 'Beta Startup', p_ticker => 'BETA', 
-        p_description => 'Risky stuff', p_init_price => 10.00, p_volatility => 0.25, 
-        o_company_id => v_comp2_id
-    );
-
-    -- 3. Gamma Energy (Mid Price, Low Volatility)
-    stock_admin.pkg_companies_admin.add_company(
-        p_sector_id => v_sec_energy_id, p_name => 'Gamma Oil', p_ticker => 'GAMM', 
-        p_description => 'Oil & Gas', p_init_price => 80.00, p_volatility => 0.03, 
-        o_company_id => v_comp3_id
-    );
-
-    -- 4. Delta Bank (Mid Price)
-    stock_admin.pkg_companies_admin.add_company(
-        p_sector_id => v_sec_finance_id, p_name => 'Delta Bank', p_ticker => 'DELT', 
-        p_description => 'Global Bank', p_init_price => 50.00, p_volatility => 0.08, 
-        o_company_id => v_comp4_id
-    );
-
-    -- 5. Epsilon Scam (To be deleted)
-    stock_admin.pkg_companies_admin.add_company(
-        p_sector_id => v_sec_finance_id, p_name => 'Epsilon Scam', p_ticker => 'SCAM', 
-        p_description => 'Bad company', p_init_price => 100.00, p_volatility => 0.50, 
-        o_company_id => v_comp5_id
-    );
-
-    DBMS_OUTPUT.PUT_LINE('Компании созданы успешно.');
-
-    -- ====================================================
-    -- 3. ТЕСТ СОРТИРОВКИ (View)
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 3. Тест Сортировки: По ЦЕНЕ (DESC) ---');
-    DBMS_OUTPUT.PUT_LINE('Ожидаем: Alpha(150) -> Epsilon(100) -> Gamma(80)...');
-
-    stock_admin.pkg_companies_view.get_all_companies(
-        p_sort_by  => 'PRICE',
-        p_sort_dir => 'DESC',
-        o_cursor   => c_cursor
-    );
-
-    LOOP
-        FETCH c_cursor INTO r_id, r_name, r_ticker, r_price, r_sec_name, r_volatility, r_status;
-        EXIT WHEN c_cursor%NOTFOUND;
-        -- Фильтруем вывод только для наших тестовых компаний
-        IF r_name IN ('Alpha Tech', 'Beta Startup', 'Gamma Oil', 'Delta Bank', 'Epsilon Scam') THEN
-            DBMS_OUTPUT.PUT_LINE('   > ' || r_name || ' ($' || r_price || ')');
-        END IF;
-    END LOOP;
-    CLOSE c_cursor;
-
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 3.1. Тест Сортировки: По ВОЛАТИЛЬНОСТИ (ASC) ---');
-    stock_admin.pkg_companies_view.get_all_companies('VOLATILITY', 'ASC', c_cursor);
-    LOOP
-        FETCH c_cursor INTO r_id, r_name, r_ticker, r_price, r_sec_name, r_volatility, r_status;
-        EXIT WHEN c_cursor%NOTFOUND;
-        IF r_name IN ('Alpha Tech', 'Beta Startup', 'Gamma Oil', 'Delta Bank', 'Epsilon Scam') THEN
-            DBMS_OUTPUT.PUT_LINE('   > ' || r_name || ' (Vol: ' || r_volatility || ')');
-        END IF;
-    END LOOP;
-    CLOSE c_cursor;
-
-    -- ====================================================
-    -- 4. ТЕСТ ФИЛЬТРАЦИИ ПО СЕКТОРУ
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 4. Тест Фильтра: Только Tech Сектор ---');
+    -- Переменные для обновления
+    v_new_name      VARCHAR2(100) := 'TestCorp_Updated_' || v_timestamp;
     
-    stock_admin.pkg_companies_view.get_companies_by_sector(v_sec_tech_id, c_cursor);
-    LOOP
-        FETCH c_cursor INTO r_id, r_name, r_ticker, r_price;
-        EXIT WHEN c_cursor%NOTFOUND;
-        DBMS_OUTPUT.PUT_LINE('   > Найдено: ' || r_name || ' (' || r_ticker || ')');
-    END LOOP;
-    CLOSE c_cursor;
+    -- Переменные для выборки из курсора
+    rec_id          NUMBER;
+    rec_name        VARCHAR2(100);
+    rec_ticker      VARCHAR2(50);
+    rec_desc        VARCHAR2(200);
+    rec_price       NUMBER;
+    rec_sect_id     NUMBER;
+    rec_sect_name   VARCHAR2(100);
+    rec_vol         NUMBER;
+    
+    -- Для прямой проверки в БД (Bypass View)
+    v_db_status     VARCHAR2(20);
+    v_db_price      NUMBER;
 
-    -- ====================================================
-    -- 5. ТЕСТ ПОИСКА (SEARCH)
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 5. Тест Поиска: запрос "elt" (должен найти D(elt)a) ---');
-    
-    stock_admin.pkg_companies_view.search_companies('elt', c_cursor);
-    LOOP
-        FETCH c_cursor INTO r_id, r_name, r_ticker, r_price, r_sec_name;
-        EXIT WHEN c_cursor%NOTFOUND;
-        DBMS_OUTPUT.PUT_LINE('   > Результат поиска: ' || r_name);
-    END LOOP;
-    CLOSE c_cursor;
-
-    -- ====================================================
-    -- 6. ТЕСТ ОБНОВЛЕНИЯ
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 6. Тест Update: Delta Bank -> Giga Bank ---');
-    
-    stock_admin.pkg_companies_admin.update_company(
-        p_company_id => v_comp4_id,
-        p_sector_id  => v_sec_finance_id,
-        p_name       => 'Giga Bank', -- New Name
-        p_description=> 'Rebranded',
-        p_volatility => 0.10
-    );
-    
-    -- Проверяем
-    stock_admin.pkg_companies_view.get_company_by_id(v_comp4_id, c_cursor);
-    FETCH c_cursor INTO r_id, r_name, r_ticker, r_name, r_price, r_id, r_sec_name, r_volatility;
-    CLOSE c_cursor;
-    DBMS_OUTPUT.PUT_LINE('   > Новое имя: ' || r_name);
-
-    -- ====================================================
-    -- 7. ТЕСТ DELIST (Мягкое удаление + Обнуление цены)
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 7. Тест Delist: Epsilon Scam ---');
-    
-    stock_admin.pkg_companies_admin.delist_company(v_comp5_id);
-    
-    -- 1. Проверяем, что цена стала 0 (прямой select для проверки)
-    DECLARE
-        v_check_price NUMBER;
-        v_check_status VARCHAR2(20);
+    -- Хелпер для вывода
+    PROCEDURE print_test(p_test_name VARCHAR2, p_expected VARCHAR2, p_actual VARCHAR2, p_msg VARCHAR2 DEFAULT NULL) IS
     BEGIN
-        SELECT current_price, status INTO v_check_price, v_check_status 
-        FROM stock_admin.companies WHERE company_id = v_comp5_id;
-        
-        DBMS_OUTPUT.PUT_LINE('   > Статус: ' || v_check_status);
-        DBMS_OUTPUT.PUT_LINE('   > Цена: $' || v_check_price);
-        
-        IF v_check_status = 'DELISTED' AND v_check_price = 0 THEN
-            DBMS_OUTPUT.PUT_LINE('   >> УСПЕХ: Компания делистингована и цена обнулена.');
+        DBMS_OUTPUT.PUT(RPAD(p_test_name, 50, '.') || ' ');
+        IF p_expected = p_actual THEN
+            DBMS_OUTPUT.PUT_LINE('[ OK ]');
         ELSE
-            DBMS_OUTPUT.PUT_LINE('   >> ОШИБКА: Неверный статус или цена.');
+            DBMS_OUTPUT.PUT_LINE('[ FAIL ] Expected: ' || p_expected || ', Got: ' || p_actual || '. Msg: ' || p_msg);
         END IF;
     END;
 
-    -- 2. Проверяем, что она пропала из общего списка (ACTIVE only)
-    DBMS_OUTPUT.PUT_LINE('   > Проверка списка ACTIVE (Epsilon не должно быть):');
-    stock_admin.pkg_companies_view.get_all_companies(o_cursor => c_cursor);
-    DBMS_OUTPUT.PUT_LINE(c_cursor%ROWCOUNT);
-    LOOP
-        FETCH c_cursor INTO r_id, r_name, r_ticker, r_price, r_sec_name, r_volatility, r_status;
-        DBMS_OUTPUT.PUT_LINE('   > ' || r_name || ' ($' || r_price || ')');
-        EXIT WHEN c_cursor%NOTFOUND;
-        IF r_name = 'Epsilon Scam' THEN
-            DBMS_OUTPUT.PUT_LINE('   >> ОШИБКА: Epsilon все еще в списке!');
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('=== ЗАПУСК ТЕСТА: IPO & DELISTING ===');
+
+    -- 0. Подготовка: Берем любой существующий сектор
+    BEGIN
+        SELECT sector_id INTO v_sector_id FROM sectors FETCH FIRST 1 ROWS ONLY;
+    EXCEPTION WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('CRITICAL: В базе нет секторов. Сначала создайте сектор.');
+        RETURN;
+    END;
+
+    -- ====================================================
+    -- 1. ТЕСТ: Успешное IPO (Add Company)
+    -- ====================================================
+    pkg_companies_admin.add_company(
+        p_sector_id    => v_sector_id,
+        p_name         => v_name,
+        p_ticker       => v_ticker,
+        p_description  => v_desc,
+        p_init_price   => v_init_price,
+        p_volatility   => v_volatility,
+        p_total_shares => v_shares,
+        o_company_id   => v_company_id,
+        o_status       => v_status,
+        o_message      => v_message
+    );
+    
+    print_test('1. IPO Creation', 'SUCCESS', v_status, 'ID: ' || v_company_id || ' Msg: ' || v_message);
+
+    -- Проверка: Создался ли Эмитент и ордер (косвенно, если статус SUCCESS, значит транзакция прошла)
+    IF v_status = 'SUCCESS' THEN
+        -- ====================================================
+        -- 2. ТЕСТ: Проверка видимости через VIEW (Get By ID)
+        -- ====================================================
+        pkg_companies_view.get_company_by_id(
+            p_company_id => v_company_id,
+            o_cursor     => v_cursor,
+            o_status     => v_status,
+            o_message    => v_message
+        );
+        
+        FETCH v_cursor INTO rec_id, rec_name, rec_ticker, rec_desc, rec_price, rec_sect_id, rec_sect_name, rec_vol;
+        
+        IF v_cursor%FOUND AND rec_name = v_name THEN
+             print_test('2. Verify View Data', 'MATCH', 'MATCH');
+        ELSE
+             print_test('2. Verify View Data', v_name, rec_name, 'Name mismatch or not found');
         END IF;
-    END LOOP;
-    CLOSE c_cursor;
+        CLOSE v_cursor;
 
-    -- ====================================================
-    -- 8. ОЧИСТКА (CLEANUP)
-    -- ====================================================
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '--- 8. Очистка данных ---');
-    
-    -- Удаляем компании
-    --DELETE FROM stock_admin.companies WHERE company_id IN (v_comp1_id, v_comp2_id, v_comp3_id, v_comp4_id, v_comp5_id);
-    -- Удаляем сектора
-    --DELETE FROM stock_admin.sectors WHERE sector_id IN (v_sec_tech_id, v_sec_energy_id, v_sec_finance_id);
-    
-    COMMIT;
-    DBMS_OUTPUT.PUT_LINE('   >> Тестовые данные удалены.');
+        -- ====================================================
+        -- 3. ТЕСТ: Обновление компании (Update)
+        -- ====================================================
+        pkg_companies_admin.update_company(
+            p_company_id  => v_company_id,
+            p_sector_id   => v_sector_id, -- Тот же сектор
+            p_name        => v_new_name,
+            p_description => 'Updated Description',
+            p_volatility  => 0.25,
+            o_status      => v_status,
+            o_message     => v_message
+        );
+        
+        print_test('3. Update Company', 'SUCCESS', v_status);
+        
+        -- Проверка обновления
+        pkg_companies_view.get_company_by_id(v_company_id, v_cursor, v_status, v_message);
+        FETCH v_cursor INTO rec_id, rec_name, rec_ticker, rec_desc, rec_price, rec_sect_id, rec_sect_name, rec_vol;
+        CLOSE v_cursor;
+        
+        IF rec_name = v_new_name THEN
+            print_test('4. Verify Update', 'MATCH', 'MATCH');
+        ELSE
+            print_test('4. Verify Update', v_new_name, rec_name, 'Name did not update');
+        END IF;
 
-    DBMS_OUTPUT.PUT_LINE(CHR(10) || '=== ТЕСТЫ ЗАВЕРШЕНЫ ===');
+        -- ====================================================
+        -- 5. ТЕСТ: Делистинг (Delist)
+        -- ====================================================
+        pkg_companies_admin.delist_company(
+            p_company_id => v_company_id,
+            o_status     => v_status,
+            o_message    => v_message
+        );
+        
+        print_test('5. Delist Action', 'SUCCESS', v_status, v_message);
+
+        -- ====================================================
+        -- 6. ТЕСТ: Проверка отсутствия в публичном VIEW
+        -- ====================================================
+        -- Пакет pkg_companies_view фильтрует по status='ACTIVE'. 
+        -- После делистинга мы НЕ должны получить данные.
+        pkg_companies_view.get_company_by_id(
+            p_company_id => v_company_id,
+            o_cursor     => v_cursor,
+            o_status     => v_status,
+            o_message    => v_message
+        );
+        
+        FETCH v_cursor INTO rec_id, rec_name, rec_ticker, rec_desc, rec_price, rec_sect_id, rec_sect_name, rec_vol;
+        
+        IF v_cursor%NOTFOUND THEN
+             print_test('6. Verify Hidden in View', 'HIDDEN', 'HIDDEN');
+        ELSE
+             print_test('6. Verify Hidden in View', 'HIDDEN', 'VISIBLE', 'Company still visible in public API!');
+        END IF;
+        CLOSE v_cursor;
+
+        -- ====================================================
+        -- 7. ТЕСТ: Прямая проверка в БД (Физическое наличие)
+        -- ====================================================
+        -- Мы должны убедиться, что строка НЕ удалена, а просто обновлена.
+        BEGIN
+            SELECT status, current_price 
+            INTO v_db_status, v_db_price
+            FROM companies 
+            WHERE company_id = v_company_id;
+            
+            IF v_db_status = 'DELISTED' AND v_db_price = 0 THEN
+                print_test('7. Verify DB State (Delisted)', 'OK', 'OK', 'Status=DELISTED, Price=0');
+            ELSE
+                print_test('7. Verify DB State (Delisted)', 'DELISTED/0', v_db_status||'/'||v_db_price);
+            END IF;
+        EXCEPTION WHEN NO_DATA_FOUND THEN
+            print_test('7. Verify DB State (Delisted)', 'EXIST', 'DELETED', 'Row was physically deleted!');
+        END;
+
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('CRITICAL: IPO Failed. ' || v_message);
+    END IF;
+
+    DBMS_OUTPUT.PUT_LINE('=== ТЕСТ ЗАВЕРШЕН ===');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('SCRIPT ERROR: ' || SQLERRM);
 END;
 /
-DELETE FROM stock_admin.companies;
-DELETE FROM stock_admin.sectors;
-

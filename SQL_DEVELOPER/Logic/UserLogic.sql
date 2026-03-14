@@ -48,52 +48,102 @@ CREATE OR REPLACE PACKAGE BODY pkg_users AS
     -- 1. РЕГИСТРАЦИЯ
     -- =============================================
     PROCEDURE register_user (
-        p_username      IN  VARCHAR2,
-        p_email         IN  VARCHAR2,
-        p_password_hash IN  VARCHAR2,
-        o_user_id       OUT NUMBER,
-        o_role_name     OUT VARCHAR2,
-        o_status        OUT VARCHAR2,
-        o_message       OUT VARCHAR2
-    ) IS
-        v_role_id NUMBER;
-    BEGIN
-        -- Инициализация
-        o_status := 'SUCCESS';
-        o_message := 'Пользователь зарегестрирован';
+    p_username      IN  VARCHAR2,
+    p_email         IN  VARCHAR2,
+    p_password_hash IN  VARCHAR2,
+    o_user_id       OUT NUMBER,
+    o_role_name     OUT VARCHAR2,
+    o_status        OUT VARCHAR2,
+    o_message       OUT VARCHAR2
+) IS
+    v_role_id NUMBER;
+    v_balance CONSTANT NUMBER := 25000;
+BEGIN
 
-        -- Валидация имени
-        IF UPPER(p_username) LIKE 'ISSUER_%' THEN
-            o_status := 'ERROR';
-            o_message := 'Используется зарезервированный системный префикс';
-            RETURN; -- Выходим без ошибки
-        END IF;
+    o_status  := 'ERROR';
+    o_message := NULL;
 
-        -- Логика
-        SELECT role_id, name INTO v_role_id, o_role_name
-        FROM roles WHERE name = 'User';
+    IF p_username IS NULL OR LENGTH(TRIM(p_username)) < 3 OR LENGTH(p_username) > 50 THEN
+        o_message := 'Имя пользователя должно быть от 3 до 50 символов';
+        RETURN;
+    END IF;
 
-        INSERT INTO users (role_id, username, email, password_hash, balance) 
-        VALUES (v_role_id, p_username, p_email, p_password_hash, 0) 
-        RETURNING user_id INTO o_user_id;
+    IF UPPER(p_username) LIKE 'ISSUER_%' THEN
+        o_message := 'Используется зарезервированный системный префикс';
+        RETURN;
+    END IF;
 
-        COMMIT;
+    IF p_email IS NULL OR NOT REGEXP_LIKE(
+        p_email,
+        '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    ) THEN
+        o_message := 'Некорректный адрес электронной почты';
+        RETURN;
+    END IF;
 
-    EXCEPTION
-        WHEN DUP_VAL_ON_INDEX THEN
-            ROLLBACK;
-            o_status := 'ERROR';
-            o_message := 'Имя пользователья или адрес эл. почты уже заняты';
-            -- Не пишем в лог, так как это бизнес-ошибка, а не сбой системы
-            
-        WHEN OTHERS THEN
-            ROLLBACK;
-            -- Пишем в лог реальную ошибку
-            stock_admin.pkg_logger.log_error('pkg_users.register_user', NULL, SQLCODE, SQLERRM);
-            -- Возвращаем клиенту общее сообщение
-            o_status := 'ERROR';
-            o_message := 'Internal System Error';
-    END register_user;
+    IF p_password_hash IS NULL OR LENGTH(p_password_hash) < 8 THEN
+        o_message := 'Пароль должен содержать минимум 8 символов';
+        RETURN;
+    END IF;
+
+    -- =====================
+    -- БИЗНЕС-ЛОГИКА
+    -- =====================
+
+    -- Роль User
+    SELECT role_id, name
+    INTO v_role_id, o_role_name
+    FROM roles
+    WHERE name = 'User';
+
+    INSERT INTO users (
+        role_id,
+        username,
+        email,
+        password_hash,
+        balance
+    )
+    VALUES (
+        v_role_id,
+        p_username,
+        p_email,
+        p_password_hash,
+        v_balance
+    )
+    RETURNING user_id INTO o_user_id;
+
+    pkg_notifications.create_personal_notification(
+        p_user_id => o_user_id,
+        p_title   => 'Добро пожаловать в StockLab',
+        p_message => 'Добро пожаловать в StockLab, ' || p_username ||
+                     '. В качестве бонуса регистрации выдано 25 000 $ для торгов.',
+        p_type    => 'TRADE',
+        o_status  => o_status,
+        o_message => o_message
+    );
+
+    o_status  := 'SUCCESS';
+    o_message := 'Пользователь успешно зарегистрирован';
+
+    COMMIT;
+
+EXCEPTION
+    WHEN DUP_VAL_ON_INDEX THEN
+        ROLLBACK;
+        o_status  := 'ERROR';
+        o_message := 'Имя пользователя или адрес электронной почты уже заняты';
+
+    WHEN OTHERS THEN
+        ROLLBACK;
+        stock_admin.pkg_logger.log_error(
+            'pkg_users.register_user',
+            NULL,
+            SQLCODE,
+            SQLERRM
+        );
+        o_status  := 'ERROR';
+        o_message := 'Internal System Error';
+END register_user;
 
     -- =============================================
     -- 2. АУТЕНТИФИКАЦИЯ
@@ -209,5 +259,5 @@ END pkg_users;
 CREATE OR REPLACE PUBLIC SYNONYM pkg_users FOR stock_admin.pkg_users;
 
 GRANT EXECUTE ON pkg_users TO stock_guest;
-GRANT EXECUTE ON pkg_users TO stock_user
+GRANT EXECUTE ON pkg_users TO stock_user;
 GRANT EXECUTE ON pkg_users TO stock_admin;

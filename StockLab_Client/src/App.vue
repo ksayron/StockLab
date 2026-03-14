@@ -13,8 +13,6 @@ const notifStore = useNotificationStore();
 const toast = useToast();
 
 onMounted(async () => {
-  // При старте приложения пытаемся восстановить сессию
-  // Если кука AuthToken есть и валидна, стор обновится и статус станет isAuthenticated = true
   await authStore.checkAuth()
   if (authStore.isAuthenticated) {
         notifStore.connect(toast);

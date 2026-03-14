@@ -37,6 +37,10 @@ CREATE USER stock_guest IDENTIFIED BY "guest123!"
     ACCOUNT UNLOCK;
 --назначение ролей    
 GRANT role_admin TO stock_admin;
+grant SELECT_CATALOG_ROLE to STOCK_ADMIN;
+grant SELECT ANY DICTIONARY to STOCK_ADMIN;
+
+
 GRANT role_user TO stock_user;
 GRANT role_guest TO stock_guest;
 

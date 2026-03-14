@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import { useRouter } from 'vue-router'
@@ -10,7 +10,7 @@ import Badge from 'primevue/badge'
 import Drawer from 'primevue/drawer'
 import AdminDrawer from '@/components/Admin/AdminDrawer.vue'
 import NotificationList from '@/components/Notifications/NotificationList.vue'
-// import NotificationList from ...
+
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -40,12 +40,32 @@ const items = ref([
     command: () => router.push('/orders'),
     class: 'text-brand-bg ',
   },
+  {
+    label: 'Аналитика',
+    icon: 'pi pi-chart-pie',
+    visible: () => auth.isAdmin,
+    command: () => router.push('/analytics'),
+    class: 'text-brand-bg ',
+  },
 ])
+
+
 
 const onLogout = async () => {
   await auth.logout()
   router.push('/login')
 }
+
+onMounted(async () => {
+    await auth.checkAuth()
+    const interval = setInterval(async () => {
+            await auth.checkAuth()
+    }, 3000);
+    
+    onUnmounted(() => {
+        clearInterval(interval);
+    });
+});
 </script>
 
 <template>
